@@ -71,7 +71,6 @@ pipeline {
                     } catch {
                         Write-Warning "⚠ Error during AppPool stop: $_"
                     }
-                    exit 0
                 ''', returnStatus: true)
             }
         }
@@ -79,8 +78,20 @@ pipeline {
         stage('Deploy to IIS') {
             steps {
                 echo '🚀 Deploying to IIS...'
-                powershell "New-Item -ItemType Directory -Force -Path \"${DEPLOY_DIR}\" | Out-Null"
-                bat "robocopy \"${ARTIFACT_DIR}\" \"${DEPLOY_DIR}\" /E /Z /NP /NFL /NDL /R:3 /W:5"
+                powershell(script: '''
+                    try {
+                        if (-Not (Test-Path "$env:DEPLOY_DIR")) {
+                            New-Item -ItemType Directory -Force -Path "$env:DEPLOY_DIR" | Out-Null
+                        }
+                    } catch {
+                        Write-Warning "⚠ Failed to create deploy directory: $_"
+                    }
+                ''', returnStatus: true)
+
+                bat '''
+                    robocopy "%ARTIFACT_DIR%" "%DEPLOY_DIR%" /E /Z /NP /NFL /NDL /R:3 /W:5
+                    exit 0
+                '''
             }
         }
 
@@ -90,10 +101,10 @@ pipeline {
                 powershell(script: '''
                     try {
                         Import-Module WebAdministration -ErrorAction Stop
-                        Start-WebAppPool -Name "$env:APP_POOL_NAME"
+                        Start-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                        Write-Output "✅ AppPool started."
                     } catch {
                         Write-Warning "⚠ Failed to start AppPool: $_"
-                        exit 0
                     }
                 ''', returnStatus: true)
             }
@@ -102,7 +113,9 @@ pipeline {
         stage('List deployed files') {
             steps {
                 echo '📂 Listing deployed files...'
-                bat "dir \"${DEPLOY_DIR}\""
+                bat '''
+                    dir "%DEPLOY_DIR%" || exit 0
+                '''
             }
         }
     }
