@@ -48,29 +48,35 @@ pipeline {
             }
         }
 
-        stage('Stop IIS AppPool') {
-            steps {
-                echo '⛔ Forcing AppPool to stop and killing w3wp.exe...'
-                powershell(returnStatus: true, script: '''
-                    try {
-                        Import-Module WebAdministration -ErrorAction Stop
-                        Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
-                        Start-Sleep -Seconds 3
-                        $p = Get-WmiObject Win32_Process -Filter "name = 'w3wp.exe'"
-                        if ($p) {
-                            $p | ForEach-Object { $_.Terminate() }
-                            Write-Output "✔ w3wp.exe processes killed."
-                        } else {
-                            Write-Output "✔ No w3wp.exe running."
-                        }
-                        exit 0
-                    } catch {
-                        Write-Warning "⚠ Failed to fully stop AppPool or kill process: $_"
-                        exit 0
+stage('Stop IIS AppPool') {
+    steps {
+        echo '⛔ Stopping AppPool and killing lock processes...'
+        powershell(returnStatus: true, script: '''
+            try {
+                Import-Module WebAdministration -ErrorAction Stop
+                Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 3
+
+                # Kill any process locking the DLL
+                $lockedDll = "C:\\inetpub\\wwwroot\\student-management-new\\student-management-new.dll"
+                Get-Process | Where-Object {
+                    $_.Modules | Where-Object {
+                        $_.FileName -eq $lockedDll
                     }
-                ''')
+                } | ForEach-Object {
+                    Write-Output "⚠ Killing process $($_.ProcessName) that locked the DLL"
+                    $_.Kill()
+                }
+
+                Start-Sleep -Seconds 2
+                exit 0
+            } catch {
+                Write-Warning "⚠ Failed to stop AppPool or release lock: $_"
+                exit 0
             }
-        }
+        ''')
+    }
+}
 
         stage('Deploy to IIS') {
             steps {
