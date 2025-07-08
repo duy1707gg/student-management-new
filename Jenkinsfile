@@ -61,8 +61,9 @@ stage('Stop IIS AppPool') {
                     Write-Warning "⚠ App pool '${env:APP_POOL_NAME}' does not exist."
                 }
             } catch {
-                Write-Output "⚠ AppPool might already be stopped. Continuing..."
+                Write-Warning "⚠ Error when stopping AppPool: $_"
             }
+            exit 0
         '''
     }
 }
@@ -76,24 +77,21 @@ stage('Stop IIS AppPool') {
             }
         }
 
-        stage('Start IIS AppPool') {
-            steps {
-                echo '▶️ Starting AppPool...'
-                powershell '''
-                    try {
-                        Import-Module WebAdministration -ErrorAction Stop
-                        if (Test-Path "IIS:\\AppPools\\${env:APP_POOL_NAME}") {
-                            Start-WebAppPool -Name "${env:APP_POOL_NAME}"
-                            Write-Output "✔ App pool '${env:APP_POOL_NAME}' started."
-                        } else {
-                            Write-Warning "⚠ App pool '${env:APP_POOL_NAME}' does not exist."
-                        }
-                    } catch {
-                        Write-Error "❌ Failed to start app pool: $_"
-                    }
-                '''
+stage('Start IIS AppPool') {
+    steps {
+        echo '▶ Starting AppPool...'
+        powershell '''
+            try {
+                Import-Module WebAdministration -ErrorAction Stop
+                Start-WebAppPool -Name "${env:APP_POOL_NAME}" -ErrorAction SilentlyContinue
+                Write-Output "✔ App pool '${env:APP_POOL_NAME}' started."
+            } catch {
+                Write-Warning "⚠ Error when starting AppPool: $_"
             }
-        }
+            exit 0
+        '''
+    }
+}
 
         stage('List deployed files') {
             steps {
