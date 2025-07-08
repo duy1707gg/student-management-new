@@ -1,5 +1,6 @@
 pipeline {
     agent any
+
     environment {
         SOLUTION = 'student-management-new.sln'
         PROJECT = 'student-management-new.csproj'
@@ -55,7 +56,7 @@ pipeline {
                         Start-Sleep -Seconds 3
 
                         $dllPath = "$env:DEPLOY_DIR\\student-management-new.dll"
-                        $procs = Get-Process | Where-Object {
+                        $procs = Get-Process -ErrorAction SilentlyContinue | Where-Object {
                             $_.Modules | Where-Object { $_.FileName -eq $dllPath }
                         }
 
@@ -68,7 +69,7 @@ pipeline {
                             Write-Output "✔ No process locking DLL."
                         }
                     } catch {
-                        Write-Warning "⚠ Error: $_"
+                        Write-Warning "⚠ Error during AppPool stop: $_"
                     }
                     exit 0
                 ''', returnStatus: true)
@@ -86,7 +87,15 @@ pipeline {
         stage('Start IIS AppPool') {
             steps {
                 echo '▶️ Starting IIS AppPool...'
-                powershell "Start-WebAppPool -Name \"${APP_POOL_NAME}\""
+                powershell(script: '''
+                    try {
+                        Import-Module WebAdministration -ErrorAction Stop
+                        Start-WebAppPool -Name "$env:APP_POOL_NAME"
+                    } catch {
+                        Write-Warning "⚠ Failed to start AppPool: $_"
+                        exit 0
+                    }
+                ''', returnStatus: true)
             }
         }
 
