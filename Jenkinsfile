@@ -2,13 +2,11 @@ pipeline {
     agent any
 
     environment {
-        DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-        CONFIGURATION = 'Release'
+        SOLUTION_NAME = 'student-management-new.sln'
+        PROJECT_NAME = 'student-management-new.csproj'
         ARTIFACTS_DIR = "${WORKSPACE}\\artifacts"
-        SLN_PATH = "${WORKSPACE}\\student-management-new.sln"
-        CSPROJ_PATH = "${WORKSPACE}\\student-management-new.csproj"
-        DEPLOY_PATH = "C:\\inetpub\\wwwroot\\student-management-new"
-        APP_POOL_NAME = "DefaultAppPool"
+        DEPLOY_DIR = 'C:\\inetpub\\wwwroot\\student-management-new'
+        APP_POOL_NAME = 'DefaultAppPool'
     }
 
     stages {
@@ -22,91 +20,95 @@ pipeline {
         stage('Clean') {
             steps {
                 echo '🧹 Cleaning artifacts folder...'
-                bat "IF EXIST \"${ARTIFACTS_DIR}\" rmdir /S /Q \"${ARTIFACTS_DIR}\""
-                bat "mkdir \"${ARTIFACTS_DIR}\""
+                bat """
+                    IF EXIST "${ARTIFACTS_DIR}" rmdir /S /Q "${ARTIFACTS_DIR}"
+                    mkdir "${ARTIFACTS_DIR}"
+                """
             }
         }
 
         stage('Restore') {
             steps {
                 echo '🔧 Restoring packages...'
-                bat "dotnet restore \"${SLN_PATH}\""
+                bat "dotnet restore \"${SOLUTION_NAME}\""
             }
         }
 
         stage('Build') {
             steps {
                 echo '⚙️ Building project...'
-                bat "dotnet build \"${SLN_PATH}\" --configuration ${CONFIGURATION} --no-restore"
+                bat "dotnet build \"${SOLUTION_NAME}\" --configuration Release --no-restore"
             }
         }
 
         stage('Publish') {
             steps {
                 echo '📦 Publishing project...'
-                bat "dotnet publish \"${CSPROJ_PATH}\" -c ${CONFIGURATION} -o \"${ARTIFACTS_DIR}\""
+                bat "dotnet publish \"${PROJECT_NAME}\" -c Release -o \"${ARTIFACTS_DIR}\""
             }
         }
 
-stage('Stop IIS AppPool') {
-    steps {
-        echo '⛔ Stopping AppPool...'
-        powershell '''
-            try {
-                Import-Module WebAdministration -ErrorAction Stop
-                if (Test-Path "IIS:\\AppPools\\${env:APP_POOL_NAME}") {
-                    Stop-WebAppPool -Name "${env:APP_POOL_NAME}" -ErrorAction SilentlyContinue
-                    Write-Output "✔ App pool '${env:APP_POOL_NAME}' stopped."
-                } else {
-                    Write-Warning "⚠ App pool '${env:APP_POOL_NAME}' does not exist."
-                }
-            } catch {
-                Write-Warning "⚠ Error when stopping AppPool: $_"
+        stage('Stop IIS AppPool') {
+            steps {
+                echo '⛔ Stopping AppPool...'
+                powershell '''
+                    try {
+                        Import-Module WebAdministration -ErrorAction Stop
+                        if (Test-Path "IIS:\\AppPools\\$env:APP_POOL_NAME") {
+                            Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                            Write-Output "✔ App pool '$env:APP_POOL_NAME' stopped."
+                        } else {
+                            Write-Warning "⚠ App pool '$env:APP_POOL_NAME' does not exist."
+                        }
+                    } catch {
+                        Write-Warning "⚠ Error stopping AppPool: $_"
+                    }
+                    exit 0
+                '''
             }
-            exit 0
-        '''
-    }
-}
+        }
 
         stage('Deploy to IIS') {
             steps {
                 echo '🚀 Deploying to IIS...'
-                bat "IF EXIST \"${DEPLOY_PATH}\" rmdir /S /Q \"${DEPLOY_PATH}\""
-                bat "mkdir \"${DEPLOY_PATH}\""
-                bat "robocopy \"${ARTIFACTS_DIR}\" \"${DEPLOY_PATH}\" /E /Z /NP /NFL /NDL /R:3 /W:5"
+                bat """
+                    IF EXIST "${DEPLOY_DIR}" rmdir /S /Q "${DEPLOY_DIR}"
+                    mkdir "${DEPLOY_DIR}"
+                    robocopy "${ARTIFACTS_DIR}" "${DEPLOY_DIR}" /E /Z /NP /NFL /NDL /R:3 /W:5
+                """
             }
         }
 
-stage('Start IIS AppPool') {
-    steps {
-        echo '▶ Starting AppPool...'
-        powershell '''
-            try {
-                Import-Module WebAdministration -ErrorAction Stop
-                Start-WebAppPool -Name "${env:APP_POOL_NAME}" -ErrorAction SilentlyContinue
-                Write-Output "✔ App pool '${env:APP_POOL_NAME}' started."
-            } catch {
-                Write-Warning "⚠ Error when starting AppPool: $_"
+        stage('Start IIS AppPool') {
+            steps {
+                echo '▶ Starting AppPool...'
+                powershell '''
+                    try {
+                        Import-Module WebAdministration -ErrorAction Stop
+                        Start-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                        Write-Output "✔ App pool '$env:APP_POOL_NAME' started."
+                    } catch {
+                        Write-Warning "⚠ Error starting AppPool: $_"
+                    }
+                    exit 0
+                '''
             }
-            exit 0
-        '''
-    }
-}
+        }
 
         stage('List deployed files') {
             steps {
-                echo '📂 Deployed files:'
-                bat "dir \"${DEPLOY_PATH}\" /S"
+                echo '📁 Deployed files:'
+                bat "dir \"${DEPLOY_DIR}\""
             }
         }
     }
 
     post {
+        success {
+            echo '✅ CI/CD completed successfully!'
+        }
         failure {
             echo '❌ CI/CD failed. Check the logs for issues.'
-        }
-        success {
-            echo '✅ CI/CD pipeline completed successfully.'
         }
     }
 }
