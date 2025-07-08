@@ -48,61 +48,66 @@ pipeline {
             }
         }
 
-stage('Stop IIS AppPool') {
-    steps {
-        echo '⛔ Stopping AppPool...'
-        powershell(returnStatus: true, script: '''
-            try {
-                Import-Module WebAdministration -ErrorAction Stop
-                Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
-                Write-Output "✔ App pool '$env:APP_POOL_NAME' stopped."
-                exit 0
-            } catch {
-                Write-Warning "⚠ Failed to stop AppPool: $_"
-                exit 0
+        stage('Stop IIS AppPool') {
+            steps {
+                echo '⛔ Forcing AppPool to stop and killing w3wp.exe...'
+                powershell(returnStatus: true, script: '''
+                    try {
+                        Import-Module WebAdministration -ErrorAction Stop
+                        Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                        Start-Sleep -Seconds 3
+                        $p = Get-WmiObject Win32_Process -Filter "name = 'w3wp.exe'"
+                        if ($p) {
+                            $p | ForEach-Object { $_.Terminate() }
+                            Write-Output "✔ w3wp.exe processes killed."
+                        } else {
+                            Write-Output "✔ No w3wp.exe running."
+                        }
+                        exit 0
+                    } catch {
+                        Write-Warning "⚠ Failed to fully stop AppPool or kill process: $_"
+                        exit 0
+                    }
+                ''')
             }
-        ''')
-    }
-}
+        }
 
         stage('Deploy to IIS') {
             steps {
                 echo '🚀 Deploying to IIS...'
+                powershell(script: """
+                    if (Test-Path '${DEPLOY_DIR}') {
+                        Remove-Item '${DEPLOY_DIR}' -Recurse -Force
+                    }
+                    New-Item -ItemType Directory -Path '${DEPLOY_DIR}'
+                """)
                 bat """
-    IF EXIST "${DEPLOY_DIR}" rmdir /S /Q "${DEPLOY_DIR}"
-    mkdir "${DEPLOY_DIR}"
-    robocopy "${ARTIFACTS_DIR}" "${DEPLOY_DIR}" /E /Z /NP /NFL /NDL /R:3 /W:5
-    IF %ERRORLEVEL% LEQ 3 (
-        exit 0
-    ) ELSE (
-        exit %ERRORLEVEL%
-    )
-"""
+                    robocopy "${ARTIFACTS_DIR}" "${DEPLOY_DIR}" /E /Z /NP /NFL /NDL /R:3 /W:5
+                """
             }
         }
 
-stage('Start IIS AppPool') {
-    steps {
-        echo '▶ Starting AppPool...'
-        powershell(returnStatus: true, script: '''
-            try {
-                Import-Module WebAdministration -ErrorAction Stop
-                if (Test-Path "IIS:\\AppPools\\$env:APP_POOL_NAME") {
-                    Start-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
-                    Write-Output "✔ App pool '$env:APP_POOL_NAME' started."
-                    exit 0
-                } else {
-                    Write-Warning "⚠ App pool '$env:APP_POOL_NAME' does not exist."
-                    exit 0
-                }
-            } catch {
-                Write-Warning "⚠ Error starting AppPool: $_"
-                exit 0
+        stage('Start IIS AppPool') {
+            steps {
+                echo '▶ Starting AppPool...'
+                powershell(returnStatus: true, script: '''
+                    try {
+                        Import-Module WebAdministration -ErrorAction Stop
+                        if (Test-Path "IIS:\\AppPools\\$env:APP_POOL_NAME") {
+                            Start-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                            Write-Output "✔ App pool '$env:APP_POOL_NAME' started."
+                            exit 0
+                        } else {
+                            Write-Warning "⚠ App pool '$env:APP_POOL_NAME' does not exist."
+                            exit 0
+                        }
+                    } catch {
+                        Write-Warning "⚠ Error starting AppPool: $_"
+                        exit 0
+                    }
+                ''')
             }
-        ''')
-    }
-}
-
+        }
 
         stage('List deployed files') {
             steps {
