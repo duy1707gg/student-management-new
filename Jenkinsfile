@@ -79,21 +79,28 @@ pipeline {
             }
         }
 
-        stage('Start IIS AppPool') {
-            steps {
-                echo '▶ Starting AppPool...'
-                powershell '''
-                    try {
-                        Import-Module WebAdministration -ErrorAction Stop
-                        Start-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
-                        Write-Output "✔ App pool '$env:APP_POOL_NAME' started."
-                    } catch {
-                        Write-Warning "⚠ Error starting AppPool: $_"
-                    }
+stage('Start IIS AppPool') {
+    steps {
+        echo '▶ Starting AppPool...'
+        powershell(returnStatus: true, script: '''
+            try {
+                Import-Module WebAdministration -ErrorAction Stop
+                if (Test-Path "IIS:\\AppPools\\$env:APP_POOL_NAME") {
+                    Start-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                    Write-Output "✔ App pool '$env:APP_POOL_NAME' started."
                     exit 0
-                '''
+                } else {
+                    Write-Warning "⚠ App pool '$env:APP_POOL_NAME' does not exist."
+                    exit 0
+                }
+            } catch {
+                Write-Warning "⚠ Error starting AppPool: $_"
+                exit 0
             }
-        }
+        ''')
+    }
+}
+
 
         stage('List deployed files') {
             steps {
