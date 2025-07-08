@@ -1,14 +1,16 @@
 pipeline {
     agent any
 
-    environment {
-        GIT_REPO = 'https://github.com/duy1707gg/student-management-new.git'
-        SOLUTION = "${env.WORKSPACE}\\student-management-new.sln"
-        CSPROJ = "${env.WORKSPACE}\\student-management-new.csproj"
-        ARTIFACT_PATH = "${env.WORKSPACE}\\artifacts"
-        IIS_DEPLOY_PATH = 'C:\\inetpub\\wwwroot\\student-management-new'
-        APP_POOL_NAME = 'DefaultAppPool'
-    }
+environment {
+    GIT_REPO = 'https://github.com/duy1707gg/student-management-new.git'
+
+    // Đường dẫn đầy đủ tới file .sln và .csproj trong thư mục con
+    SOLUTION = "${env.WORKSPACE}\\student-management-new\\student-management-new.sln"
+    CSPROJ = "${env.WORKSPACE}\\student-management-new\\student-management-new.csproj"
+    ARTIFACT_PATH = "${env.WORKSPACE}\\artifacts"
+    IIS_DEPLOY_PATH = 'C:\\inetpub\\wwwroot\\student-management-new'
+    APP_POOL_NAME = 'DefaultAppPool'
+}
 
     stages {
         stage('Checkout') {
