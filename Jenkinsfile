@@ -48,25 +48,22 @@ pipeline {
             }
         }
 
-        stage('Stop IIS AppPool') {
-            steps {
-                echo '⛔ Stopping AppPool...'
-                powershell '''
-                    try {
-                        Import-Module WebAdministration -ErrorAction Stop
-                        if (Test-Path "IIS:\\AppPools\\$env:APP_POOL_NAME") {
-                            Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
-                            Write-Output "✔ App pool '$env:APP_POOL_NAME' stopped."
-                        } else {
-                            Write-Warning "⚠ App pool '$env:APP_POOL_NAME' does not exist."
-                        }
-                    } catch {
-                        Write-Warning "⚠ Error stopping AppPool: $_"
-                    }
-                    exit 0
-                '''
+stage('Stop IIS AppPool') {
+    steps {
+        echo '⛔ Stopping AppPool...'
+        powershell(returnStatus: true, script: '''
+            try {
+                Import-Module WebAdministration -ErrorAction Stop
+                Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
+                Write-Output "✔ App pool '$env:APP_POOL_NAME' stopped."
+                exit 0
+            } catch {
+                Write-Warning "⚠ Failed to stop AppPool: $_"
+                exit 0
             }
-        }
+        ''')
+    }
+}
 
         stage('Deploy to IIS') {
             steps {
