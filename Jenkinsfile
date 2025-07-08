@@ -29,7 +29,7 @@ pipeline {
         stage('Restore') {
             steps {
                 echo '🔧 Restoring packages...'
-                bat "dotnet restore \"${env.SOLUTION}\""
+                bat "dotnet restore \"${env.WORKSPACE}\\student-management-new.sln\""
             }
         }
 
