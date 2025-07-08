@@ -1,0 +1,7 @@
+D:\student-management-new\student-management-new\publish\student-management-new.exe
+D:\student-management-new\student-management-new\publish\appsettings.Development.json
+D:\student-management-new\student-management-new\publish\appsettings.json
+D:\student-management-new\student-management-new\publish\student-management-new.dll
+D:\student-management-new\student-management-new\publish\student-management-new.deps.json
+D:\student-management-new\student-management-new\publish\student-management-new.runtimeconfig.json
+D:\student-management-new\student-management-new\publish\student-management-new.pdb

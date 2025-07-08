@@ -1,14 +1,20 @@
 var builder = WebApplication.CreateBuilder(args);
 
-// 👇 Lắng nghe nhiều port
-builder.WebHost.UseUrls("http://localhost:5000", "http://localhost:81", "http://*:8080");
+builder.WebHost.UseUrls("http://localhost:5000", "http://localhost:81");
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// 👇 Cấu hình chạy trong virtual directory
+app.UsePathBase("/student-management-new");
+app.Use(async (context, next) =>
+{
+    context.Request.PathBase = "/student-management-new";
+    await next();
+});
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -16,15 +22,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 // app.UseHttpsRedirection();
+app.UseStaticFiles();  // ✅ Load CSS/JS
 app.UseRouting();
-
 app.UseAuthorization();
-
-app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
