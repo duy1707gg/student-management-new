@@ -69,10 +69,15 @@ stage('Stop IIS AppPool') {
             steps {
                 echo '🚀 Deploying to IIS...'
                 bat """
-                    IF EXIST "${DEPLOY_DIR}" rmdir /S /Q "${DEPLOY_DIR}"
-                    mkdir "${DEPLOY_DIR}"
-                    robocopy "${ARTIFACTS_DIR}" "${DEPLOY_DIR}" /E /Z /NP /NFL /NDL /R:3 /W:5
-                """
+    IF EXIST "${DEPLOY_DIR}" rmdir /S /Q "${DEPLOY_DIR}"
+    mkdir "${DEPLOY_DIR}"
+    robocopy "${ARTIFACTS_DIR}" "${DEPLOY_DIR}" /E /Z /NP /NFL /NDL /R:3 /W:5
+    IF %ERRORLEVEL% LEQ 3 (
+        exit 0
+    ) ELSE (
+        exit %ERRORLEVEL%
+    )
+"""
             }
         }
 
