@@ -51,17 +51,17 @@ pipeline {
 stage('Stop IIS AppPool') {
     steps {
         echo '⛔ Stopping AppPool and killing lock processes...'
-        powershell(returnStatus: true, script: '''
+        powershell(script: '''
             try {
                 Import-Module WebAdministration -ErrorAction Stop
                 Stop-WebAppPool -Name "$env:APP_POOL_NAME" -ErrorAction SilentlyContinue
                 Start-Sleep -Seconds 3
 
                 # Kill any process locking the DLL
-                $lockedDll = "C:\\inetpub\\wwwroot\\student-management-new\\student-management-new.dll"
+                $dllPath = "C:\\inetpub\\wwwroot\\student-management-new\\student-management-new.dll"
                 Get-Process | Where-Object {
                     $_.Modules | Where-Object {
-                        $_.FileName -eq $lockedDll
+                        $_.FileName -eq $dllPath
                     }
                 } | ForEach-Object {
                     Write-Output "⚠ Killing process $($_.ProcessName) that locked the DLL"
@@ -69,12 +69,12 @@ stage('Stop IIS AppPool') {
                 }
 
                 Start-Sleep -Seconds 2
-                exit 0
             } catch {
-                Write-Warning "⚠ Failed to stop AppPool or release lock: $_"
-                exit 0
+                Write-Warning "⚠ Failed: $_"
             }
-        ''')
+
+            exit 0  # ✅ Fix: không trả lỗi về Jenkins
+        ''', returnStatus: true)
     }
 }
 
